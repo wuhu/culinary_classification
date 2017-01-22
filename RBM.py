@@ -1,3 +1,4 @@
+
 # ----------------------------------------------------
 # Training a Centered Deep Boltzmann Machine
 # ----------------------------------------------------
@@ -103,6 +104,7 @@ class DBM:
         for i in range(0,len(self.W)):
             self.W[i] += lr*(numpy.dot((     X[i]-self.O[i]).T,     X[i+1]-self.O[i+1]) -
                              numpy.dot((self.X[i]-self.O[i]).T,self.X[i+1]-self.O[i+1]))/len(Xd)
+
         for i in range(0,len(self.B)):
             self.B[i] += lr*(X[i]-self.X[i]).mean(axis=0)
         
@@ -110,24 +112,55 @@ class DBM:
         for l in range(0,len(self.B)): self.reparamB(X,l)
         for l in range(0,len(self.O)): self.reparamO(X,l)
 
+    def fit(self, Xd, niterations):
+        print 'len W: %s' % len(self.W)
+        for it in range(niterations):
+            print 'fitting %d' % it
+            # Perform some learning steps
+            for _ in range(100): 
+                self.learn(Xd[numpy.random.permutation(len(Xd))[:mb]])
+            W = 1
+            for l in range(len(self.W)):
+                W = numpy.dot(W, self.W[l])
+                m = int(W.shape[1]**.5)
+        return self
+
 # ====================================================
 # Example of execution
 # ====================================================
 
 # Initialize MNIST dataset and centered DBM
-X = (numpy.fromfile(open(DIR + 'train-images-idx3-ubyte','r'),dtype='ubyte',count=16+784*60000)[16:].reshape([60000,784])).astype('float32')/255.0
-nn = DBM([784]+hlayers,[arcsigm(numpy.clip(X.mean(axis=0),0.01,0.99))]+biases)
 
-for it in range(1000):
+def initialize_mnist(X, hlayers, biases):
+    nn = DBM(hlayers,[arcsigm(numpy.clip(X.mean(axis=0),0.01,0.99))]+biases)
+    return nn
 
-    # Perform some learning steps
-    for _ in range(100): nn.learn(X[numpy.random.permutation(len(X))[:mb]])
-    
-    # Output some debugging information
-    print(("%03d |" + " %.3f "*len(nn.W))%tuple([it]+[W.std() for W in nn.W]))
-    W = 1
-    for l in range(len(nn.W)):
-        W = numpy.dot(W,nn.W[l])
-        m = int(W.shape[1]**.5)
-        render(W.reshape([28,28,m,m]).transpose([2,0,3,1]).reshape([28*m,28*m]),'W%d.jpg'%(l+1));
-    render((nn.X[0]).reshape([mb,28,28]).transpose([1,0,2]).reshape([28,mb*28]),'X.jpg');
+
+def learn_dbm(nn, X, quiet=False, niterations=100):
+    for it in range(niterations):
+        # Perform some learning steps
+        for _ in range(100): nn.learn(X[numpy.random.permutation(len(X))[:mb]])
+        
+        # Output some debugging information
+        if not quiet:
+            print(("%03d |" + " %.3f "*len(nn.W))%tuple([it]+[W.std() for W in nn.W]))
+        W = 1
+        for l in range(len(nn.W)):
+            W = numpy.dot(W,nn.W[l])
+            m = int(W.shape[1]**.5)
+            if not quiet:
+                render(W.reshape([28,28,m,m]).transpose([2,0,3,1]).reshape([28*m,28*m]),'W%d.jpg'%(l+1));
+        if not quiet:
+            render((nn.X[0]).reshape([mb,28,28]).transpose([1,0,2]).reshape([28,mb*28]),'X.jpg');
+    return nn
+
+
+def load_data():
+    X = (numpy.fromfile(open(DIR + 'train-images-idx3-ubyte','r'),dtype='ubyte',count=16+784*60000)[16:].reshape([60000,784])).astype('float32')/255.0
+    return X
+
+
+if __name__ == '__main__':
+    X = (numpy.fromfile(open(DIR + 'train-images-idx3-ubyte','r'),dtype='ubyte',count=16+784*60000)[16:].reshape([60000,784])).astype('float32')/255.0
+    nn = initialize_mnist(X, [784] + hlayers, biases)
+    nn.fit(X)
